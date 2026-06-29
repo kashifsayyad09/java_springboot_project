@@ -147,7 +147,7 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             set -e
-            HEALTH=$(curl -s http://locahost:8084/actuator/health)
+            HEALTH=$(curl -s http://localhost:8084/actuator/health)
             echo "Health endpoint response : $HEALTH"
             
             if [[ "$HEALTH" != *'"status":"UP"'* ]]; then
