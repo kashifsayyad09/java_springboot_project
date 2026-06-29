@@ -25,8 +25,8 @@ jobs:
             set -e
 
             APP_DIR=/home/ec2-user/front
-            REPO_NAME=Java-springboot-project
-            REPO_URL=https://github.com/CloudTechDevOps/Java-springboot-project.git
+            REPO_NAME=java_springboot_project
+            REPO_URL=https://github.com/kashifsayyad09/java_springboot_project.git
 
             echo "🚀 Starting deployment..."
 
@@ -35,13 +35,15 @@ jobs:
 
             # Clone or pull latest code
             if [ -d "$REPO_NAME/.git" ]; then
-              cd $REPO_NAME
-              git reset --hard
-              git pull origin main
-            else
-              git clone $REPO_URL
-              cd $REPO_NAME
-            fi
+                      echo "Repository already exists. Pulling latest changes..."
+                      cd $REPO_NAME
+                      git reset --hard
+                      git pull origin main
+                   else
+                     echo "Cloning repository..."
+                     git clone $REPO_URL
+                     cd $REPO_NAME
+                     fi
 
             # Install Python
             sudo dnf install -y python3 python3-pip
