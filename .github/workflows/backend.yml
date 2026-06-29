@@ -104,7 +104,7 @@ jobs:
             LOG_DIR=/var/log/app
             sudo mkdir -p $LOG_DIR
             sudo chown ec2-user:ec2-user $LOG_DIR
-            cd /home/ec2-user/app/java_springboot_project/target/
+            cd /home/ec2-user/app/java_springboot_project/backend/target
             nohup env \
               MYSQL_HOST=${{ secrets.MYSQL_HOST }} \
               MYSQL_PORT=${{ secrets.MYSQL_PORT }} \
