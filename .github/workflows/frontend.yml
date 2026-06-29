@@ -96,6 +96,6 @@ jobs:
             sudo journalctl -u frontend -n 50 --no-pager
 
             echo "========== Health Check =========="
-            curl -I http://172.31.5.177:8501
+            curl -I http://localhost:8501
 
             echo "✅ Streamlit Frontend deployed successfully."
