@@ -1,173 +1,173 @@
-# name : Backend Build
+name : Backend Build
 
-# on :
-#     push:
-#       branches:
-#         - main
+on :
+    push:
+      branches:
+        - main
 
-# jobs:
-#     build-deploy:
-#       runs-on: ubuntu-latest
-#       steps:
-#         #  ⭐️ 1. Checkout your code
-#       - name: Checkout Repository
-#         uses: actions/checkout@v2
+jobs:
+    build-deploy:
+      runs-on: ubuntu-latest
+      steps:
+        #  ⭐️ 1. Checkout your code
+      - name: Checkout Repository
+        uses: actions/checkout@v2
 
-#         #  ⭐️ 2. prepare ec2 instance to deploy backend java
-#       - name: Deploy to EC2
-#         uses: appleboy/ssh-action@v1.1.0
-#         with: 
-#           host: ${{ secrets.EC2_HOST }}
-#           username: ec2-user
-#           key: ${{ secrets.EC2_KEY }}
-#           script: |
-#             set -e
-#             sudo yum install -y git maven java-17-amazon-corretto -y
+        #  ⭐️ 2. prepare ec2 instance to deploy backend java
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.1.0
+        with: 
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            sudo yum install -y git maven java-17-amazon-corretto -y
 
-#         #   ⭐️ 3. Clone your repository and pull
-#       - name: Clone Repository / Pull
-#         uses: appleboy/ssh-action@v1.1.0
-#         with:
-#             host: ${{ secrets.EC2_HOST }}
-#             username: ec2-user
-#             key: ${{ secrets.EC2_KEY }}
-#             script: |
-#                    set -e
+        #   ⭐️ 3. Clone your repository and pull
+      - name: Clone Repository / Pull
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+            host: ${{ secrets.EC2_HOST }}
+            username: ec2-user
+            key: ${{ secrets.EC2_KEY }}
+            script: |
+                   set -e
 
-#                    APP_DIR=/home/ec2-user/app
-#                    REPO_NAME=java_springboot_project
-#                    REPO_URL=https://github.com/kashifsayyad09/java_springboot_project.git
+                   APP_DIR=/home/ec2-user/app
+                   REPO_NAME=java_springboot_project
+                   REPO_URL=https://github.com/kashifsayyad09/java_springboot_project.git
 
-#                    mkdir -p $APP_DIR
-#                    cd $APP_DIR
+                   mkdir -p $APP_DIR
+                   cd $APP_DIR
 
-#                    if [ -d "$REPO_NAME/.git" ]; then
-#                       echo "Repository already exists. Pulling latest changes..."
-#                       cd $REPO_NAME
-#                       git reset --hard
-#                       git pull origin main
-#                    else
-#                      echo "Cloning repository..."
-#                      git clone $REPO_URL
-#                      cd $REPO_NAME
-#                      fi
+                   if [ -d "$REPO_NAME/.git" ]; then
+                      echo "Repository already exists. Pulling latest changes..."
+                      cd $REPO_NAME
+                      git reset --hard
+                      git pull origin main
+                   else
+                     echo "Cloning repository..."
+                     git clone $REPO_URL
+                     cd $REPO_NAME
+                     fi
 
-#                     pwd
-#                     ls -la
+                    pwd
+                    ls -la
 
 
-#         #   ⭐️ 4. Build your application
-#       - name: Build Application Maven
-#         uses: appleboy/ssh-action@v1.1.0
-#         with:
-#           host: ${{ secrets.EC2_HOST }}
-#           username: ec2-user
-#           key: ${{ secrets.EC2_KEY }}
-#           script: |
-#             set -e
-#             cd /home/ec2-user/app/java_springboot_project/backend
-#             mvn clean
-#             mvn clean package -DskipTests -U
+        #   ⭐️ 4. Build your application
+      - name: Build Application Maven
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            cd /home/ec2-user/app/java_springboot_project/backend
+            mvn clean
+            mvn clean package -DskipTests -U
 
-#         #   ⭐️ 5. STOP OLD APPLICATION
-#       - name: Stop Old Application
-#         uses: appleboy/ssh-action@v1.1.0
-#         with:
-#           host: ${{ secrets.EC2_HOST }}
-#           username: ec2-user
-#           key: ${{ secrets.EC2_KEY }}
-#           script: |
-#             PIDS=$(pgrep -f "java.*datastore-0.0.7.jar" true)
-#             if [ -n "$PIDS" ]; then
-#               echo "Killing old application PIDs:$PIDS"
-#               kill $PIDS true
-#               sleep 5
-#               for PID in $PIDS; do
-#                 if ps -p $PID > /dev/null; then
-#                   echo "Killing PID $PID again"
-#                   kill -9 $PID
-#                 fi
-#               done
-#             else 
-#               echo "No old application found"
-#             fi
+        #   ⭐️ 5. STOP OLD APPLICATION
+      - name: Stop Old Application
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            PIDS=$(pgrep -f "java.*datastore-0.0.7.jar" true)
+            if [ -n "$PIDS" ]; then
+              echo "Killing old application PIDs:$PIDS"
+              kill $PIDS true
+              sleep 5
+              for PID in $PIDS; do
+                if ps -p $PID > /dev/null; then
+                  echo "Killing PID $PID again"
+                  kill -9 $PID
+                fi
+              done
+            else 
+              echo "No old application found"
+            fi
 
-#         #   ⭐️ 6. Start new application
-#       - name: Start New Application
-#         uses: appleboy/ssh-action@v1.1.0
-#         with:
-#           host: ${{ secrets.EC2_HOST }}
-#           username: ec2-user
-#           key: ${{ secrets.EC2_KEY }}
-#           script: |
-#             set -e
-#             LOG_DIR=/var/log/app
-#             sudo mkdir -p $LOG_DIR
-#             sudo chown ec2-user:ec2-user $LOG_DIR
-#             cd /home/ec2-user/app/java_springboot_project/backend/target
-#             nohup env \
-#               MYSQL_HOST=${{ secrets.MYSQL_HOST }} \
-#               MYSQL_PORT=${{ secrets.MYSQL_PORT }} \
-#               MYSQL_USERNAME=${{ secrets.DB_USERNAME }} \
-#               MYSQL_PASSWORD=${{ secrets.DB_PASSWORD }} \
-#               LOG_FILE_PATH=$LOG_DIR/datastore.log \
-#               java -jar datastore-0.0.7.jar \
-#               --server.port=8084 \
-#               > $LOG_DIR/nohup.out 2>&1 &
+        #   ⭐️ 6. Start new application
+      - name: Start New Application
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            LOG_DIR=/var/log/app
+            sudo mkdir -p $LOG_DIR
+            sudo chown ec2-user:ec2-user $LOG_DIR
+            cd /home/ec2-user/app/java_springboot_project/backend/target
+            nohup env \
+              MYSQL_HOST=${{ secrets.MYSQL_HOST }} \
+              MYSQL_PORT=${{ secrets.MYSQL_PORT }} \
+              MYSQL_USERNAME=${{ secrets.DB_USERNAME }} \
+              MYSQL_PASSWORD=${{ secrets.DB_PASSWORD }} \
+              LOG_FILE_PATH=$LOG_DIR/datastore.log \
+              java -jar datastore-0.0.7.jar \
+              --server.port=8084 \
+              > $LOG_DIR/nohup.out 2>&1 &
 
-#       #   #   ⭐️ 7. Check logs
-#       # - name: Check Logs
-#       #   uses: appleboy/ssh-action@v1.1.0
-#       #   with:
-#       #     host: ${{ secrets.EC2_HOST }}
-#       #     username: ec2-user
-#       #     key: ${{ secrets.EC2_KEY }}
-#       #     script: |
-#       #       set -e
-#       #       LOG_DIR=/var/log/app
-#       #       tail -n 100 $LOG_DIR/datastore.log
+      #   #   ⭐️ 7. Check logs
+      # - name: Check Logs
+      #   uses: appleboy/ssh-action@v1.1.0
+      #   with:
+      #     host: ${{ secrets.EC2_HOST }}
+      #     username: ec2-user
+      #     key: ${{ secrets.EC2_KEY }}
+      #     script: |
+      #       set -e
+      #       LOG_DIR=/var/log/app
+      #       tail -n 100 $LOG_DIR/datastore.log
 
-#         #   ⭐️ 8. wait for application is running
-#       - name: Wait for application is running
-#         uses: appleboy/ssh-action@v1.1.0
-#         with:
-#           host: ${{ secrets.EC2_HOST }}
-#           username: ec2-user
-#           key: ${{ secrets.EC2_KEY }}
-#           script: |
-#             echo "wait for 15 seconds to application"
-#             sleep 15
+        #   ⭐️ 8. wait for application is running
+      - name: Wait for application is running
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "wait for 15 seconds to application"
+            sleep 15
         
-#         #  ⭐️ 9. Verify DB Connection
-#       - name: Verify DB Connection
-#         uses: appleboy/ssh-action@v1.1.0
-#         with:
-#           host: ${{ secrets.EC2_HOST }}
-#           username: ec2-user
-#           key: ${{ secrets.EC2_KEY }}
-#           script: |
-#             set -e
-#             HEALTH=$(curl -s http://localhost:8084/actuator/health)
-#             echo "Health endpoint response : $HEALTH"
+        #  ⭐️ 9. Verify DB Connection
+      - name: Verify DB Connection
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            HEALTH=$(curl -s http://localhost:8084/actuator/health)
+            echo "Health endpoint response : $HEALTH"
             
-#             if [[ "$HEALTH" != *'"status":"UP"'* ]]; then
-#               echo "Application is not running"
-#               exit 1
-#             fi
+            if [[ "$HEALTH" != *'"status":"UP"'* ]]; then
+              echo "Application is not running"
+              exit 1
+            fi
       
-#             if [[ "$HEALTH" == *'"db"'* ]]; then
-#               if [[ "$HEALTH" != *'"status":"UP"'* ]]; then
-#                 echo "❌ DB not UP!"
-#                 exit 1
-#               fi
-#               echo "✅ DB is UP"
-#             else
-#               echo "⚠️ DB health not exposed, skipping check"
-#             fi
+            if [[ "$HEALTH" == *'"db"'* ]]; then
+              if [[ "$HEALTH" != *'"status":"UP"'* ]]; then
+                echo "❌ DB not UP!"
+                exit 1
+              fi
+              echo "✅ DB is UP"
+            else
+              echo "⚠️ DB health not exposed, skipping check"
+            fi
       
-#             echo "✅ Application is UP"
+            echo "✅ Application is UP"
       
-#             echo "✅ Application and DB are UP"
+            echo "✅ Application and DB are UP"
 
 
 
