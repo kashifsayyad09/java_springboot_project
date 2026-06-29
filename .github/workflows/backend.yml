@@ -65,7 +65,7 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             set -e
-            cd /home/ec2-user/app/java_springboot_project/backend/
+            cd /home/ec2-user/app/java_springboot_project/backend
             mvn clean
             mvn clean package -DskipTests -U
 
