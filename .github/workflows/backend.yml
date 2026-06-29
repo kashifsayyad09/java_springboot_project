@@ -41,7 +41,7 @@ jobs:
                    mkdir -p $APP_DIR
                    cd $APP_DIR
 
-                   if [ -d "$REPO_NAME" ]; then
+                   if [ -d "$REPO_NAME/.git" ]; then
                       echo "Repository already exists. Pulling latest changes..."
                       cd $REPO_NAME
                       git reset --hard
