@@ -25,26 +25,35 @@ jobs:
             sudo yum install -y git maven java-17-amazon-corretto -y
 
         #   ⭐️ 3. Clone your repository and pull
-      - name: Clone Repository / pull
+      - name: Clone Repository / Pull
         uses: appleboy/ssh-action@v1.1.0
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            set -e
-            APP_DIR=/home/ec2-user/app
-            REPO_NAME=java_springboot_project
-            REPO_URL=https://github.com/kashifsayyad09/java_springboot_project.git
-            mkdir -p $APP_DIR
-            if [ ! -d "$APP_DIR/$REPO_NAME" ]; then
-              cd $REPO_NAME
-              git reset --hard
-              git pull origin main
-            else
-              git clone $REPO_URL
-              cd $REPO_NAME
-            fi
+            host: ${{ secrets.EC2_HOST }}
+            username: ec2-user
+            key: ${{ secrets.EC2_KEY }}
+            script: |
+                   set -e
+
+                   APP_DIR=/home/ec2-user/app
+                   REPO_NAME=java_springboot_project
+                   REPO_URL=https://github.com/kashifsayyad09/java_springboot_project.git
+
+                   mkdir -p $APP_DIR
+                   cd $APP_DIR
+
+                   if [ -d "$REPO_NAME" ]; then
+                      echo "Repository already exists. Pulling latest changes..."
+                      cd $REPO_NAME
+                      git reset --hard
+                      git pull origin main
+                   else
+                     echo "Cloning repository..."
+                     git clone $REPO_URL
+                     cd $REPO_NAME
+                     fi
+
+                    pwd
+                    ls -la
 
 
         #   ⭐️ 4. Build your application
