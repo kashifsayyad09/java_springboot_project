@@ -68,7 +68,7 @@ jobs:
             User=ec2-user
             WorkingDirectory=/home/ec2-user/front/java_springboot_project/frontend
 
-            Environment=API_URL=http://localhost:8084
+            Environment=API_URL=http://172.31.5.177:8084
 
             ExecStart=/home/ec2-user/front/java_springboot_project/frontend/venv/bin/streamlit run app.py --server.port=8501 --server.address=0.0.0.0
 
@@ -96,6 +96,6 @@ jobs:
             sudo journalctl -u frontend -n 50 --no-pager
 
             echo "========== Health Check =========="
-            curl -I http://localhost:8501
+            curl -I http://172.31.5.177:8501
 
             echo "✅ Streamlit Frontend deployed successfully."
