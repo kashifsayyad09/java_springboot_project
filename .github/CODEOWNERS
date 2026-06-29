@@ -3,7 +3,7 @@
 
 # Owners for workspace/editor configuration and CI
 .vscode/ @vardhan1228 @adinahamjad18127-maker
-.github/workflows/ @vardhan1228 @adinahamjad18127-maker
+.github/workflows/ @kashifsayyad09 @vardhan1228 @adinahamjad18127-maker
 
 # General fallback owners for everything else
-* @vardhan1228 @adinahamjad18127-maker
+* @kashifsayyad09 @cloudtechdevops
