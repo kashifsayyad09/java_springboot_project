@@ -1,50 +1,50 @@
 name: Deploy Streamlit Frontend to EC2
 
 on:
-  workflow_run:
-    workflows: ["Deploy Backend to EC2"]
-    types:
-      - completed
+  push:
+    branches:
+      - main
 
 jobs:
-  deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  deploy-frontend:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repositor
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH
+      - name: Deploy Frontend to EC2
         uses: appleboy/ssh-action@v1.1.0
         with:
-          host: ${{ secrets.EC2_HOST_F }}
+          host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_KEY }}
           script: |
-            set -e
+            set -eux
 
             APP_DIR=/home/ec2-user/front
-            REPO_NAME=Java-springboot-project
+            REPO_NAME=java_springboot_project
             REPO_URL=https://github.com/kashifsayyad09/java_springboot_project.git
 
-            echo "🚀 Starting deployment..."
+            echo "🚀 Starting Streamlit Frontend Deployment..."
 
-            mkdir -p $APP_DIR
-            cd $APP_DIR
+            # Install required packages
+            sudo dnf install -y git python3 python3-pip
 
-            # Clone or pull latest code
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
+
+            # Clone or update repository
             if [ -d "$REPO_NAME/.git" ]; then
-              cd $REPO_NAME
-              git reset --hard
-              git pull origin main
+              echo "Repository exists. Updating..."
+              cd "$REPO_NAME"
+              git fetch origin
+              git reset --hard origin/main
             else
-              git clone $REPO_URL
-              cd $REPO_NAME
+              echo "Cloning repository..."
+              git clone "$REPO_URL" "$REPO_NAME"
+              cd "$REPO_NAME"
             fi
-
-            # Install Python
-            sudo dnf install -y python3 python3-pip
 
             cd frontend
 
@@ -58,33 +58,44 @@ jobs:
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            # 🔥 Create/Update systemd service file
+            # Create systemd service
             sudo tee /etc/systemd/system/frontend.service > /dev/null <<EOF
             [Unit]
-            Description=Streamlit Frontend App
+            Description=Streamlit Frontend
             After=network.target
-            
+
             [Service]
             User=ec2-user
             WorkingDirectory=/home/ec2-user/front/java_springboot_project/frontend
-            
-            ExecStart=/bin/bash -c 'source /home/ec2-user/front/java_springboot_project/frontend/venv/bin/activate && streamlit run app.py --server.port=8501 --server.address=0.0.0.0'
-            
-            Environment=API_URL=http://172.31.5.177:8084
-            
+
+            Environment=API_URL=http://localhost:8084
+
+            ExecStart=/home/ec2-user/front/java_springboot_project/frontend/venv/bin/streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+
             Restart=always
             RestartSec=5
-            
+
             StandardOutput=append:/home/ec2-user/frontend.log
             StandardError=append:/home/ec2-user/frontend-error.log
-            
+
             [Install]
             WantedBy=multi-user.target
             EOF
 
-            # Reload and restart service
+            # Restart service
             sudo systemctl daemon-reload
             sudo systemctl enable frontend
             sudo systemctl restart frontend
 
-            echo "✅ Deployment successful"
+            sleep 10
+
+            echo "========== Service Status =========="
+            sudo systemctl status frontend --no-pager
+
+            echo "========== Recent Logs =========="
+            sudo journalctl -u frontend -n 50 --no-pager
+
+            echo "========== Health Check =========="
+            curl -I http://localhost:8501
+
+            echo "✅ Streamlit Frontend deployed successfully."
