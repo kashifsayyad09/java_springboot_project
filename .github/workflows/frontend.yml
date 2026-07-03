@@ -1,10 +1,11 @@
 name: Deploy Streamlit Frontend to EC2
 
 on:
-  push:
-    branches:
-      - main
-
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch: 
+  
 jobs:
   deploy-frontend:
     runs-on: ubuntu-latest
