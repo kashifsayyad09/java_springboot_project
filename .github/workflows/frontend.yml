@@ -132,6 +132,26 @@ jobs:
          --command-id $COMMAND_ID \
          --instance-id "${{ secrets.INSTANCE_ID }}"  
 
+
+      - name: Stop Old Frontend
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "${{ secrets.INSTANCE_ID }}" \
+          --document-name "AWS-RunShellScript" \
+          --parameters 'commands=[
+          "echo Stopping frontend service...",
+          "sudo systemctl stop frontend || true",
+          "sudo systemctl disable frontend || true",
+          "pkill -f streamlit || true",
+          "sleep 5"
+          ]' \
+          --query "Command.CommandId" \
+          --output text)
+
+          aws ssm wait command-executed \
+          --command-id $COMMAND_ID \
+          --instance-id "${{ secrets.INSTANCE_ID }}"   
+
       - name: Restart Frontend
         run: |
           COMMAND_ID=$(aws ssm send-command \
