@@ -14,89 +14,146 @@ jobs:
       - name: Checkout Repositor
         uses: actions/checkout@v4
 
-      - name: Deploy Frontend to EC2
-        uses: appleboy/ssh-action@v1.1.0
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
-          host: ${{ secrets.EC2_HOST_F }}
-          username: ec2-user
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            set -eux
+          distribution: temurin
+          java-version: 17
 
-            APP_DIR=/home/ec2-user/front
-            REPO_NAME=java_springboot_project
-            REPO_URL=https://github.com/kashifsayyad09/java_springboot_project.git
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=frontend
+            -Dsonar.projectName=frontend
+            -Dsonar.sources=frontend
 
-            echo "🚀 Starting Streamlit Frontend Deployment..."
+      - name: SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1.2.0
+        timeout-minutes: 10
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-            # Install required packages
-            sudo dnf install -y git python3 python3-pip
+      - name: Clone / Pull Repository
+        run: |
+         COMMAND_ID=$(aws ssm send-command \
+         --instance-ids "${{ secrets.INSTANCE_ID }}" \
+         --document-name "AWS-RunShellScript" \
+         --parameters 'commands=[
+         "APP_DIR=/home/ec2-user/front",
+         "REPO_NAME=java_springboot_project",
+         "REPO_URL=https://github.com/kashifsayyad09/java_springboot_project.git",
+         "mkdir -p $APP_DIR",
+         "cd $APP_DIR",
+         "if [ -d \"$REPO_NAME/.git\" ]; then cd $REPO_NAME && git reset --hard && git pull origin main; else git clone $REPO_URL && cd $REPO_NAME; fi"
+         ]' \
+         --query "Command.CommandId" \
+         --output text)
 
-            mkdir -p "$APP_DIR"
-            cd "$APP_DIR"
+         aws ssm wait command-executed \
+         --command-id $COMMAND_ID \
+         --instance-id "${{ secrets.INSTANCE_ID }}"   
 
-            # Clone or update repository
-            if [ -d "$REPO_NAME/.git" ]; then
-              echo "Repository exists. Updating..."
-              cd "$REPO_NAME"
-              git fetch origin
-              git reset --hard origin/main
-            else
-              echo "Cloning repository..."
-              git clone "$REPO_URL" "$REPO_NAME"
-              cd "$REPO_NAME"
-            fi
+      - name: Install Python
+        run: |    
+         COMMAND_ID=$(aws ssm send-command \
+         --instance-ids "${{ secrets.INSTANCE_ID }}" \
+         --document-name AWS-RunShellScript \
+         --parameters 'commands=[
+         "sudo dnf install -y python3 python3-pip",
+         "cd /home/ec2-user/front/java_springboot_project/frontend",
+         "python3 -m venv venv || true"
+         ]' \
+         --query "Command.CommandId" \
+         --output text)
 
-            cd frontend
+         aws ssm wait command-executed \
+         --command-id $COMMAND_ID \
+         --instance-id "${{ secrets.INSTANCE_ID }}"
 
-            # Create virtual environment
-            if [ ! -d "venv" ]; then
-              python3 -m venv venv
-            fi
+      - name: Install Python Packages
+        run: |
+         COMMAND_ID=$(aws ssm send-command \
+         --instance-ids "${{ secrets.INSTANCE_ID }}" \
+         --document-name AWS-RunShellScript \
+         --parameters 'commands=[
+         "cd /home/ec2-user/front/java_springboot_project/frontend",
+         "source venv/bin/activate",
+         "pip install --upgrade pip",
+         "pip install -r requirements.txt"
+         ]' \
+         --query "Command.CommandId" \
+         --output text)
 
-            source venv/bin/activate
+         aws ssm wait command-executed \
+         --command-id $COMMAND_ID \
+         --instance-id "${{ secrets.INSTANCE_ID }}"          
 
-            pip install --upgrade pip
-            pip install -r requirements.txt
+      - name: Configure Frontend Service
+        run: |
+         COMMAND_ID=$(aws ssm send-command \
+         --instance-ids "${{ secrets.INSTANCE_ID }}" \
+         --document-name AWS-RunShellScript \
+         --parameters 'commands=[
+         "sudo tee /etc/systemd/system/frontend.service >/dev/null <<EOF
+         [Unit]
+         Description=Streamlit Frontend
+         After=network.target
 
-            # Create systemd service
-            sudo tee /etc/systemd/system/frontend.service > /dev/null <<EOF
-            [Unit]
-            Description=Streamlit Frontend
-            After=network.target
+         [Service]
+         User=ec2-user
+         WorkingDirectory=/home/ec2-user/front/java_springboot_project/frontend
+         ExecStart=/bin/bash -c '\''source /home/ec2-user/front/java_springboot_project/frontend/venv/bin/activate && streamlit run app.py --server.port=8501 --server.address=0.0.0.0'\''
+         Environment=API_URL=http://localhost:8084
+         Restart=always
+         RestartSec=5
 
-            [Service]
-            User=ec2-user
-            WorkingDirectory=/home/ec2-user/front/java_springboot_project/frontend
+         [Install]
+         WantedBy=multi-user.target
+         EOF"
+         ]' \
+         --query "Command.CommandId" \
+         --output text)
 
-            Environment=API_URL=http://172.31.5.177:8084
+         aws ssm wait command-executed \
+         --command-id $COMMAND_ID \
+         --instance-id "${{ secrets.INSTANCE_ID }}"  
 
-            ExecStart=/home/ec2-user/front/java_springboot_project/frontend/venv/bin/streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+      - name: Restart Frontend
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "${{ secrets.INSTANCE_ID }}" \
+          --document-name AWS-RunShellScript \
+          --parameters 'commands=[
+          "sudo systemctl daemon-reload",
+          "sudo systemctl enable frontend",
+          "sudo systemctl restart frontend"
+          ]' \
+          --query "Command.CommandId" \
+          --output text)
 
-            Restart=always
-            RestartSec=5
+          aws ssm wait command-executed \
+          --command-id $COMMAND_ID \
+          --instance-id "${{ secrets.INSTANCE_ID }}"  
 
-            StandardOutput=append:/home/ec2-user/frontend.log
-            StandardError=append:/home/ec2-user/frontend-error.log
+      - name: Verify Frontend
+        run: |
+         COMMAND_ID=$(aws ssm send-command \
+         --instance-ids "${{ secrets.INSTANCE_ID }}" \
+         --document-name AWS-RunShellScript \
+         --parameters 'commands=[
+         "sleep 15",
+         "curl -I http://localhost:8501"
+         ]' \
+         --query "Command.CommandId" \
+         --output text)
 
-            [Install]
-            WantedBy=multi-user.target
-            EOF
+         aws ssm wait command-executed \
+         --command-id $COMMAND_ID \
+         --instance-id "${{ secrets.INSTANCE_ID }}"   
 
-            # Restart service
-            sudo systemctl daemon-reload
-            sudo systemctl enable frontend
-            sudo systemctl restart frontend
-
-            sleep 10
-
-            echo "========== Service Status =========="
-            sudo systemctl status frontend --no-pager
-
-            echo "========== Recent Logs =========="
-            sudo journalctl -u frontend -n 50 --no-pager
-
-            echo "========== Health Check =========="
-            curl -I http://localhost:8501
-
-            echo "✅ Streamlit Frontend deployed successfully."
+         
+     
