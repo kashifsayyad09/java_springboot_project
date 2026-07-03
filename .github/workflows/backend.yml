@@ -158,3 +158,25 @@ jobs:
          aws ssm wait command-executed \
          --command-id $COMMAND_ID \
          --instance-id "${{ secrets.INSTANCE_ID }}"     
+
+      - name: Send Deployment Report
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: Backend Deployment Report - ${{ github.repository }}
+          to: ${{ secrets.EMAIL_TO }}
+          from: ${{ secrets.EMAIL_USERNAME }}
+          body: |
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Status: ${{ job.status }}
+            Actor: ${{ github.actor }}
+            Workflow: ${{ github.workflow }}
+            SonarQube: Completed
+            Quality Gate: Passed if workflow succeeded.         
