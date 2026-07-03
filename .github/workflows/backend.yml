@@ -23,7 +23,7 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: http://100.54.200.141:9000
+          SONAR_HOST_URL: http://3.237.81.195:9000
         with:
           args: >
             -Dsonar.projectKey=dashboard-pipeline
