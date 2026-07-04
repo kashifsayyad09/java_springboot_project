@@ -11,6 +11,16 @@ resource "aws_security_group" "bastion_host" {
     protocol    = "tcp"
     cidr_blocks = var.allowed_ssh_cidr
   }
+
+  ingress {
+    description = "Allow Sonar"
+    from_port   = 9000
+    to_port     = 9000
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_ssh_cidr
+  }
+
+
   ingress {
     description = "Allow SSH"
     from_port   = 80
