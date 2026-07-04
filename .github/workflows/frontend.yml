@@ -117,7 +117,7 @@ jobs:
          User=ec2-user
          WorkingDirectory=/home/ec2-user/front/java_springboot_project/frontend
          ExecStart=/bin/bash -c '\''source /home/ec2-user/front/java_springboot_project/frontend/venv/bin/activate && streamlit run app.py --server.port=8501 --server.address=0.0.0.0'\''
-         Environment=API_URL=http://localhost:8084
+         Environment=API_URL=http://internal-backend-alb-1390412139.us-east-1.elb.amazonaws.com
          Restart=always
          RestartSec=5
 
