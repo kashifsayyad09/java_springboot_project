@@ -41,7 +41,7 @@ jobs:
         run: terraform init
 
       - name: Deploy VPC
-        run: terraform destroy -auto-approve -target=module.vpc
+        run: terraform apply -auto-approve -target=module.vpc
 
       - name: Deploy Bastion
         run: terraform apply -auto-approve -target=module.bastion
