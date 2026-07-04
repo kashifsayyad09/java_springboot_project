@@ -80,7 +80,7 @@ resource "aws_security_group" "alb_backend" {
   vpc_id      = var.vpc_id
 
   ingress = [
-    for port in [80, 443] : {
+    for port in [80, 443, 8084] : {
       description      = "Allow HTTP/HTTPS"
       from_port        = port
       to_port          = port
@@ -144,7 +144,7 @@ resource "aws_security_group" "backend_server" {
   vpc_id      = var.vpc_id
 
   ingress = [
-    for port in [22, 8084] : {
+    for port in [22, 8084, 80] : {
       description      = "Allow SSH/HTTP"
       from_port        = port
       to_port          = port
