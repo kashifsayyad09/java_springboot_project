@@ -41,25 +41,25 @@ jobs:
         run: terraform init
 
       - name: Deploy VPC
-        run: terraform destroy -auto-approve -target=module.vpc
+        run: terraform apply -auto-approve -target=module.vpc
 
       - name: Deploy Bastion
-        run: terraform destroy -auto-approve -target=module.bastion
+        run: terraform apply -auto-approve -target=module.bastion
 
       - name: Deploy Frontend EC2
-        run: terraform destroy -auto-approve -target=module.frontend-ec2
+        run: terraform apply -auto-approve -target=module.frontend-ec2
 
       - name: Deploy Backend EC2
-        run: terraform destroy -auto-approve -target=module.backend-ec2
+        run: terraform apply -auto-approve -target=module.backend-ec2
 
       - name: Deploy Frontend ALB
-        run: terraform destroy -auto-approve -target=module.frontend_alb
+        run: terraform apply -auto-approve -target=module.frontend_alb
 
       - name: Deploy Backend ALB
-        run: terraform destroy -auto-approve -target=module.backend_alb
+        run: terraform apply -auto-approve -target=module.backend_alb
 
       - name: Deploy RDS
-        run: terraform destroy -auto-approve -target=module.rds
+        run: terraform apply -auto-approve -target=module.rds
 
 # #########################################################
 # # Phase 2 - Deploy Application
@@ -130,16 +130,16 @@ jobs:
 #         run: terraform init
 
 #       - name: Frontend Launch Template
-#         run: terraform destroy -auto-approve -target=module.frontend_launchtemplate
+#         run: terraform apply -auto-approve -target=module.frontend_launchtemplate
 
 #       - name: Backend Launch Template
-#         run: terraform destroy -auto-approve -target=module.backend_launchtemplate
+#         run: terraform apply -auto-approve -target=module.backend_launchtemplate
 
 #       - name: Backend ASG
-#         run: terraform destroy -auto-approve -target=module.asg_backend
+#         run: terraform apply -auto-approve -target=module.asg_backend
 
 #       - name: Frontend ASG
-#         run: terraform destroy -auto-approve -target=module.asg_frontend
+#         run: terraform apply -auto-approve -target=module.asg_frontend
 
-#       - name: Final Terraform destroy
-#         run: terraform destroy -auto-approve
+#       - name: Final Terraform apply
+#         run: terraform apply -auto-approve
