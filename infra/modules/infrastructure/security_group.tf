@@ -112,7 +112,7 @@ resource "aws_security_group" "frontend_server" {
   vpc_id      = var.vpc_id
 
   ingress = [
-    for port in [22, 80] : {
+    for port in [22, 80, 8501] : {
       description      = "Allow SSH/HTTP"
       from_port        = port
       to_port          = port
@@ -144,7 +144,7 @@ resource "aws_security_group" "backend_server" {
   vpc_id      = var.vpc_id
 
   ingress = [
-    for port in [22, 5000] : {
+    for port in [22, 8084] : {
       description      = "Allow SSH/HTTP"
       from_port        = port
       to_port          = port
