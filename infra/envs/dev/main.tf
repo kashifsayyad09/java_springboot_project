@@ -57,7 +57,7 @@ module "bastion" {
 source = "../../modules/bastion"
 aws_region = "us-east-1"
 ami = "ami-00ca32bbc84273381"
-instance_type = "t3.micro"
+instance_type = "c7i-flex.large"
 key_name = "us-east-1"
 subnet_id = module.vpc.public_subnets[0]
 security_group_id = module.vpc.bastion_sg_id
