@@ -47,10 +47,10 @@ jobs:
         run: terraform apply -auto-approve -target=module.bastion
 
       - name: Deploy Frontend EC2
-        run: terraform apply -auto-approve -target=module.frontend_ec2
+        run: terraform apply -auto-approve -target=module.frontend-ec2
 
       - name: Deploy Backend EC2
-        run: terraform apply -auto-approve -target=module.backend_ec2
+        run: terraform apply -auto-approve -target=module.backend-ec2
 
       - name: Deploy Frontend ALB
         run: terraform apply -auto-approve -target=module.frontend_alb
