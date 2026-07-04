@@ -1,12 +1,12 @@
 resource "aws_lb_target_group" "back_end" {
   name     = var.target_group_name
-  port     = 5000
+  port     = 8084
   protocol = "HTTP"
   vpc_id   = var.vpc_id
   #adding health check path
   health_check {
     enabled             = true
-    path                = "/api"
+    path                = "/"
     protocol            = "HTTP"
     port                = "traffic-port"
     matcher             = "200"
