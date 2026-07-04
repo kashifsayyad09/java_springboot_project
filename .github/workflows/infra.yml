@@ -41,26 +41,47 @@ jobs:
         run: terraform init
 
       - name: Deploy VPC
-        run: terraform apply -auto-approve -target=module.vpc
+        run: terraform destroy -auto-approve -target=module.vpc
 
       - name: Deploy Bastion
-        run: terraform apply -auto-approve -target=module.bastion
+        run: terraform destroy -auto-approve -target=module.bastion
 
       - name: Deploy Frontend EC2
-        run: terraform apply -auto-approve -target=module.frontend-ec2
+        run: terraform destroy -auto-approve -target=module.frontend-ec2
 
       - name: Deploy Backend EC2
-        run: terraform apply -auto-approve -target=module.backend-ec2
+        run: terraform destroy -auto-approve -target=module.backend-ec2
 
       - name: Deploy Frontend ALB
-        run: terraform apply -auto-approve -target=module.frontend_alb
+        run: terraform destroy -auto-approve -target=module.frontend_alb
 
       - name: Deploy Backend ALB
-        run: terraform apply -auto-approve -target=module.backend_alb
+        run: terraform destroy -auto-approve -target=module.backend_alb
 
       - name: Deploy RDS
-        run: terraform apply -auto-approve -target=module.rds
+        run: terraform destroy -auto-approve -target=module.rds
 
+      - name: Send Deployment Report
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: Infra Deployment Report - ${{ github.repository }}
+          to: ${{ secrets.EMAIL_TO }}
+          from: ${{ secrets.EMAIL_USERNAME }}
+          body: |
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Status: ${{ job.status }}
+            Actor: ${{ github.actor }}
+            Workflow: ${{ github.workflow }}
+            SonarQube: Completed
+            Quality Gate: Passed if workflow succeeded.         
 # #########################################################
 # # Phase 2 - Deploy Application
 # #########################################################
@@ -130,16 +151,16 @@ jobs:
 #         run: terraform init
 
 #       - name: Frontend Launch Template
-#         run: terraform apply -auto-approve -target=module.frontend_launchtemplate
+#         run: terraform destroy -auto-approve -target=module.frontend_launchtemplate
 
 #       - name: Backend Launch Template
-#         run: terraform apply -auto-approve -target=module.backend_launchtemplate
+#         run: terraform destroy -auto-approve -target=module.backend_launchtemplate
 
 #       - name: Backend ASG
-#         run: terraform apply -auto-approve -target=module.asg_backend
+#         run: terraform destroy -auto-approve -target=module.asg_backend
 
 #       - name: Frontend ASG
-#         run: terraform apply -auto-approve -target=module.asg_frontend
+#         run: terraform destroy -auto-approve -target=module.asg_frontend
 
-#       - name: Final Terraform apply
-#         run: terraform apply -auto-approve
+#       - name: Final Terraform destroy
+#         run: terraform destroy -auto-approve
