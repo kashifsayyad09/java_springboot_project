@@ -30,7 +30,7 @@ module "frontend-ec2" {
 source = "../../modules/frontend/ec2"
 aws_region = "us-east-1"
 ami = "ami-00ca32bbc84273381"
-instance_type = "t2.micro"
+instance_type = "t3.micro"
 key_name = "us-east-1"
 subnet_id = module.vpc.public_subnets[0]
 security_group_id = module.vpc.bastion_sg_id
@@ -44,7 +44,7 @@ module "backend-ec2" {
 source = "../../modules/backend/ec2"
 aws_region = "us-east-1"
 ami = "ami-00ca32bbc84273381"
-instance_type = "t2.micro"
+instance_type = "t3.micro"
 key_name = "us-east-1"
 subnet_id = module.vpc.public_subnets[0]
 security_group_id = module.vpc.backend_server_sg_id
@@ -57,7 +57,7 @@ module "bastion" {
 source = "../../modules/bastion"
 aws_region = "us-east-1"
 ami = "ami-00ca32bbc84273381"
-instance_type = "t2.micro"
+instance_type = "t3.micro"
 key_name = "us-east-1"
 subnet_id = module.vpc.public_subnets[0]
 security_group_id = module.vpc.bastion_sg_id
