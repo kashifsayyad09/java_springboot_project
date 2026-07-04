@@ -28,6 +28,21 @@ resource "aws_security_group" "bastion_host" {
     protocol    = "tcp"
     cidr_blocks = var.allowed_ssh_cidr
   }
+    ingress {
+    description = "Allow SSH"
+    from_port   = 8501
+    to_port     = 8501
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_ssh_cidr
+  }
+
+    ingress {
+    description = "Allow SSH"
+    from_port   = 8084
+    to_port     = 8084
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_ssh_cidr
+  }
 
   egress {
     from_port   = 0
