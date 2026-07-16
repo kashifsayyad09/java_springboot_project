@@ -91,7 +91,7 @@ jobs:
           --command-id $COMMAND_ID \
           --instance-id "${{ secrets.INSTANCE_ID }}"
 
-      - name: Build Application
+      - name: Build Applications
         run: |
          COMMAND_ID=$(aws ssm send-command \
          --instance-ids "${{ secrets.INSTANCE_ID }}" \
