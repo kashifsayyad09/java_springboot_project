@@ -1,25 +1,27 @@
-name: Deploy Streamlit Frontend to EC2
+name: Frontend Docker Deployment
 
 on:
-  # push:
-  #   branches:
-  #     - main
   workflow_dispatch:
-  
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: 615037471716
+  ECR_REPOSITORY: frontend
+  IMAGE_TAG: ${{ github.run_number }}
+  IMAGE_URI: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
 permissions:
   id-token: write
   contents: read
-  
+
 jobs:
   deploy-frontend:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
@@ -45,149 +47,43 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.ARN }}
-          aws-region: us-east-1   
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Clone / Pull Repository
-        run: |
-         COMMAND_ID=$(aws ssm send-command \
-         --instance-ids "${{ secrets.INSTANCE_ID }}" \
-         --document-name "AWS-RunShellScript" \
-         --parameters 'commands=[
-         "APP_DIR=/home/ec2-user/front",
-         "REPO_NAME=java_springboot_project",
-         "REPO_URL=https://github.com/kashifsayyad09/java_springboot_project.git",
-         "mkdir -p $APP_DIR",
-         "cd $APP_DIR",
-         "if [ -d \"$REPO_NAME/.git\" ]; then cd $REPO_NAME && git reset --hard && git pull origin main; else git clone $REPO_URL && cd $REPO_NAME; fi"
-         ]' \
-         --query "Command.CommandId" \
-         --output text)
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
-         aws ssm wait command-executed \
-         --command-id $COMMAND_ID \
-         --instance-id "${{ secrets.INSTANCE_ID }}"   
+      - name: Build Docker Image
+        run: docker build -t $IMAGE_URI ./frontend
 
-      - name: Install Python
-        run: |    
-         COMMAND_ID=$(aws ssm send-command \
-         --instance-ids "${{ secrets.INSTANCE_ID }}" \
-         --document-name AWS-RunShellScript \
-         --parameters 'commands=[
-         "sudo dnf install -y python3 python3-pip",
-         "cd /home/ec2-user/front/java_springboot_project/frontend",
-         "python3 -m venv venv || true"
-         ]' \
-         --query "Command.CommandId" \
-         --output text)
+      - name: Push Docker Image
+        run: docker push $IMAGE_URI
 
-         aws ssm wait command-executed \
-         --command-id $COMMAND_ID \
-         --instance-id "${{ secrets.INSTANCE_ID }}"
-
-      - name: Install Python Packages
-        run: |
-         COMMAND_ID=$(aws ssm send-command \
-         --instance-ids "${{ secrets.INSTANCE_ID }}" \
-         --document-name AWS-RunShellScript \
-         --parameters 'commands=[
-         "cd /home/ec2-user/front/java_springboot_project/frontend",
-         "source venv/bin/activate",
-         "pip install --upgrade pip",
-         "pip install -r requirements.txt"
-         ]' \
-         --query "Command.CommandId" \
-         --output text)
-
-         aws ssm wait command-executed \
-         --command-id $COMMAND_ID \
-         --instance-id "${{ secrets.INSTANCE_ID }}"          
-
-      - name: Configure Frontend Service
-        run: |
-         COMMAND_ID=$(aws ssm send-command \
-         --instance-ids "${{ secrets.INSTANCE_ID }}" \
-         --document-name AWS-RunShellScript \
-         --parameters 'commands=[
-         "sudo tee /etc/systemd/system/frontend.service >/dev/null <<EOF
-         [Unit]
-         Description=Streamlit Frontend
-         After=network.target
-
-         [Service]
-         User=ec2-user
-         WorkingDirectory=/home/ec2-user/front/java_springboot_project/frontend
-         ExecStart=/bin/bash -c '\''source /home/ec2-user/front/java_springboot_project/frontend/venv/bin/activate && streamlit run app.py --server.port=8501 --server.address=0.0.0.0'\''
-         Environment=API_URL=http://internal-backend-alb-1390412139.us-east-1.elb.amazonaws.com
-         Restart=always
-         RestartSec=5
-
-         [Install]
-         WantedBy=multi-user.target
-         EOF"
-         ]' \
-         --query "Command.CommandId" \
-         --output text)
-
-         aws ssm wait command-executed \
-         --command-id $COMMAND_ID \
-         --instance-id "${{ secrets.INSTANCE_ID }}"  
-
-
-      - name: Stop Old Frontend
+      - name: Deploy to EC2
+        env:
+          API_URL: http://internal-backend-alb-1390412139.us-east-1.elb.amazonaws.com
         run: |
           COMMAND_ID=$(aws ssm send-command \
-          --instance-ids "${{ secrets.INSTANCE_ID }}" \
-          --document-name "AWS-RunShellScript" \
-          --parameters 'commands=[
-          "echo Stopping frontend service...",
-          "sudo systemctl stop frontend || true",
-          "sudo systemctl disable frontend || true",
-          "pkill -f streamlit || true",
-          "sleep 5"
-          ]' \
-          --query "Command.CommandId" \
-          --output text)
+            --instance-ids "${{ secrets.INSTANCE_ID }}" \
+            --document-name AWS-RunShellScript \
+            --parameters "commands=[
+            \"aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com\",
+            \"sudo docker pull $IMAGE_URI\",
+            \"OLD_IMAGE=\\$(sudo docker inspect frontend --format='{{.Config.Image}}' 2>/dev/null || true)\",
+            \"sudo docker stop frontend || true\",
+            \"sudo docker rm frontend || true\",
+            \"sudo docker run -d --name frontend --restart unless-stopped -p 8501:8501 -e API_URL=$API_URL $IMAGE_URI\",
+            \"sleep 20\",
+            \"curl -f http://localhost:8501 || (echo Rollback && sudo docker stop frontend && sudo docker rm frontend && if [ -n \\\"\\$OLD_IMAGE\\\" ]; then sudo docker run -d --name frontend --restart unless-stopped -p 8501:8501 -e API_URL=$API_URL \\$OLD_IMAGE; fi; exit 1)\"
+            ]" \
+            --query Command.CommandId \
+            --output text)
 
           aws ssm wait command-executed \
-          --command-id $COMMAND_ID \
-          --instance-id "${{ secrets.INSTANCE_ID }}"   
+            --command-id $COMMAND_ID \
+            --instance-id "${{ secrets.INSTANCE_ID }}"
 
-      - name: Restart Frontend
-        run: |
-          COMMAND_ID=$(aws ssm send-command \
-          --instance-ids "${{ secrets.INSTANCE_ID }}" \
-          --document-name AWS-RunShellScript \
-          --parameters 'commands=[
-          "sudo systemctl daemon-reload",
-          "sudo systemctl enable frontend",
-          "sudo systemctl restart frontend"
-          ]' \
-          --query "Command.CommandId" \
-          --output text)
-
-          aws ssm wait command-executed \
-          --command-id $COMMAND_ID \
-          --instance-id "${{ secrets.INSTANCE_ID }}"  
-
-      - name: Verify Frontend
-        run: |
-         COMMAND_ID=$(aws ssm send-command \
-         --instance-ids "${{ secrets.INSTANCE_ID }}" \
-         --document-name AWS-RunShellScript \
-         --parameters 'commands=[
-         "sleep 15",
-         "curl -I http://localhost:8501"
-         ]' \
-         --query "Command.CommandId" \
-         --output text)
-
-         aws ssm wait command-executed \
-         --command-id $COMMAND_ID \
-         --instance-id "${{ secrets.INSTANCE_ID }}"   
-
-
-      - name: 📧 Send Deployment Report
-        if: success() || failure()
+      - name: Send Deployment Report
+        if: always()
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
@@ -195,31 +91,14 @@ jobs:
           secure: true
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: AI Deployment Report - ${{ github.repository }}
+          subject: Frontend Docker Deployment Report - ${{ github.repository }}
           to: ${{ secrets.EMAIL_TO }}
           from: ${{ secrets.EMAIL_USERNAME }}
-
           body: |
-            🚀 AI Deployment Report
-
-            Repository : ${{ github.repository }}
-            Workflow   : ${{ github.workflow }}
-            Branch     : ${{ github.ref_name }}
-            Commit     : ${{ github.sha }}
-
-            Status     : ${{ job.status }}
-
-            Triggered By : ${{ github.actor }}
-            Run Number   : ${{ github.run_number }}
-
-            SonarQube Analysis : Completed
-            Quality Gate       : Passed
-
-            Deployment Target  : EC2
-            Frontend URL       : http://${{ secrets.EC2_HOST }}:8501
-
-            Regards,
-            GitHub Actions   
-
-         
-     
+            Repository: ${{ github.repository }}
+            Workflow: ${{ github.workflow }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Status: ${{ job.status }}
+            Image: $IMAGE_URI
+            Deployment: Docker + Amazon ECR
