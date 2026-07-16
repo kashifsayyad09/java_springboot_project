@@ -1,0 +1,222 @@
+name: Backend Docker Deployment
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  backend-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      ##################################################
+      # Checkout Repository
+      ##################################################
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      ##################################################
+      # Java
+      ##################################################
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      ##################################################
+      # SonarQube Scan
+      ##################################################
+      - name: Build & SonarQube Scan
+        working-directory: backend
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          mvn clean verify sonar:sonar \
+            -DskipTests \
+            -Dsonar.projectKey=backend \
+            -Dsonar.projectName=backend \
+            -Dsonar.host.url=$SONAR_HOST_URL \
+            -Dsonar.token=$SONAR_TOKEN
+
+      ##################################################
+      # Quality Gate
+      ##################################################
+      - name: SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1.2.0
+        timeout-minutes: 10
+        with:
+          scanMetadataReportFile: backend/target/sonar/report-task.txt
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      ##################################################
+      # AWS Login
+      ##################################################
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.ARN }}
+          aws-region: us-east-1
+
+      ##################################################
+      # Install Docker & Git
+      ##################################################
+      - name: Install Docker on EC2
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "${{ secrets.INSTANCE_ID }}" \
+          --document-name AWS-RunShellScript \
+          --parameters 'commands=[
+          "sudo yum install -y git",
+          "sudo yum install -y docker",
+          "sudo systemctl enable docker",
+          "sudo systemctl start docker",
+          "sudo usermod -aG docker ec2-user"
+          ]' \
+          --query "Command.CommandId" \
+          --output text)
+
+          aws ssm wait command-executed \
+          --command-id $COMMAND_ID \
+          --instance-id "${{ secrets.INSTANCE_ID }}"
+
+      ##################################################
+      # Clone Repository
+      ##################################################
+      - name: Clone Repository
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "${{ secrets.INSTANCE_ID }}" \
+          --document-name AWS-RunShellScript \
+          --parameters 'commands=[
+          "APP_DIR=/home/ec2-user/app",
+          "REPO_NAME=java_springboot_project",
+          "REPO_URL=https://github.com/kashifsayyad09/java_springboot_project.git",
+          "mkdir -p $APP_DIR",
+          "cd $APP_DIR",
+          "if [ -d \"$REPO_NAME/.git\" ]; then cd $REPO_NAME && git reset --hard && git pull origin main; else git clone $REPO_URL && cd $REPO_NAME; fi"
+          ]' \
+          --query "Command.CommandId" \
+          --output text)
+
+          aws ssm wait command-executed \
+          --command-id $COMMAND_ID \
+          --instance-id "${{ secrets.INSTANCE_ID }}"
+
+      ##################################################
+      # Build Docker Image
+      ##################################################
+      - name: Build Docker Image
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "${{ secrets.INSTANCE_ID }}" \
+          --document-name AWS-RunShellScript \
+          --parameters 'commands=[
+          "cd /home/ec2-user/app/java_springboot_project/backend",
+          "sudo docker build -t backend:latest ."
+          ]' \
+          --query "Command.CommandId" \
+          --output text)
+
+          aws ssm wait command-executed \
+          --command-id $COMMAND_ID \
+          --instance-id "${{ secrets.INSTANCE_ID }}"
+
+      ##################################################
+      # Stop Old Container
+      ##################################################
+      - name: Stop Old Container
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "${{ secrets.INSTANCE_ID }}" \
+          --document-name AWS-RunShellScript \
+          --parameters 'commands=[
+          "sudo docker stop backend || true",
+          "sudo docker rm backend || true"
+          ]' \
+          --query "Command.CommandId" \
+          --output text)
+
+          aws ssm wait command-executed \
+          --command-id $COMMAND_ID \
+          --instance-id "${{ secrets.INSTANCE_ID }}"
+
+      ##################################################
+      # Run Container
+      ##################################################
+      - name: Start Docker Container
+        env:
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "${{ secrets.INSTANCE_ID }}" \
+          --document-name AWS-RunShellScript \
+          --parameters "commands=[
+          \"sudo docker run -d --name backend \
+          -p 8084:8084 \
+          -e MYSQL_HOST=$MYSQL_HOST \
+          -e MYSQL_PORT=$MYSQL_PORT \
+          -e MYSQL_USERNAME=$DB_USERNAME \
+          -e MYSQL_PASSWORD=$DB_PASSWORD \
+          --restart unless-stopped \
+          backend:latest\"
+          ]" \
+          --query "Command.CommandId" \
+          --output text)
+
+          aws ssm wait command-executed \
+          --command-id $COMMAND_ID \
+          --instance-id "${{ secrets.INSTANCE_ID }}"
+
+      ##################################################
+      # Health Check
+      ##################################################
+      - name: Verify Health
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "${{ secrets.INSTANCE_ID }}" \
+          --document-name AWS-RunShellScript \
+          --parameters 'commands=[
+          "sleep 20",
+          "curl -f http://localhost:8084/actuator/health"
+          ]' \
+          --query "Command.CommandId" \
+          --output text)
+
+          aws ssm wait command-executed \
+          --command-id $COMMAND_ID \
+          --instance-id "${{ secrets.INSTANCE_ID }}"
+
+      ##################################################
+      # Deployment Report
+      ##################################################
+      - name: Send Deployment Report
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: Backend Docker Deployment Report - ${{ github.repository }}
+          to: ${{ secrets.EMAIL_TO }}
+          from: ${{ secrets.EMAIL_USERNAME }}
+          body: |
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Status: ${{ job.status }}
+            Workflow: ${{ github.workflow }}
+            Deployment Type: Docker
+            SonarQube: Completed
+            Quality Gate: Passed if workflow succeeded.
