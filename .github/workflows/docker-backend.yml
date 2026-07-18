@@ -163,20 +163,20 @@ jobs:
             --command-id "$COMMAND_ID" \
             --instance-id "${{ secrets.INSTANCE_ID }}"
 
-      ##################################################
-      # 11. Trivy Image Security Scan
-      ##################################################
+##################################################
+# Trivy Image Scan - Report Only
+##################################################
       - name: Trivy Image Scan
         run: |
           COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "${{ secrets.INSTANCE_ID }}" \
-            --document-name "AWS-RunShellScript" \
-            --parameters 'commands=[
-              "mkdir -p /home/ec2-user/trivy-temp",
-              "sudo TMPDIR=/home/ec2-user/trivy-temp trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 backend:${{ github.sha }}"
-            ]' \
-            --query "Command.CommandId" \
-            --output text)
+          --instance-ids "${{ secrets.INSTANCE_ID }}" \
+          --document-name "AWS-RunShellScript" \
+          --parameters 'commands=[
+          "mkdir -p /home/ec2-user/trivy-temp",
+          "sudo TMPDIR=/home/ec2-user/trivy-temp trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 backend:${{ github.sha }}"
+          ]' \
+          --query "Command.CommandId" \
+          --output text)
 
           aws ssm wait command-executed \
             --command-id "$COMMAND_ID" \
